@@ -118,7 +118,9 @@
 
 <script>
   // ===== CONFIG =====
-  const WEBHOOK_URL = "REPLACE_WITH_N8N_PRODUCTION_WEBHOOK_URL";
+  // Same-origin serverless function (see api/submit.js) backed by Postgres.
+  // No external webhook needed; this deploys alongside the page on Vercel.
+  const WEBHOOK_URL = "/api/submit";
   const CALENDLY_URL = "REPLACE_WITH_CALENDLY_OR_BOOKINGS_URL";
   // ===================
 

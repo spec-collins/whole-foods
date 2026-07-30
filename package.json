@@ -1,0 +1,12 @@
+{
+  "name": "wf-vendor-response",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Whole Foods vendor packaging-data response landing page, backed by a small Vercel serverless API and Postgres for tracking every response.",
+  "scripts": {
+    "db:migrate": "psql \"$DATABASE_URL\" -f db/schema.sql"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}
