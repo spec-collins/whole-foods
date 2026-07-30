@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Vendor Responses</title>
+<style>
+  :root {
+    --forest-green: #2D6B2F;
+    --navy: #1D3461;
+    --sage: #A8CEA8;
+    --pale-green: #EFF6EF;
+    --off-white: #F5F8F2;
+    --charcoal: #1A2A1A;
+    --muted: #5C6B5C;
+    --danger: #B3261E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--off-white);
+    color: var(--charcoal);
+    padding: 24px 16px 64px;
+    font-size: 14px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 20px; color: var(--forest-green); margin: 0; }
+  .subtle { color: var(--muted); font-size: 13px; }
+  .card {
+    background: #fff; border: 1px solid var(--sage); border-radius: 10px;
+    padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+  input[type="password"], input[type="search"], select {
+    padding: 10px 12px; border: 1px solid var(--sage); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #fff; color: var(--charcoal);
+    min-width: 0;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--forest-green); outline-offset: 2px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .row > .grow { flex: 1; min-width: 200px; }
+  button {
+    background: var(--forest-green); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  button.secondary { background: #fff; color: var(--navy); border: 1px solid var(--sage); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 12px; }
+  .tile { background: var(--pale-green); border: 1px solid var(--sage); border-radius: 8px; padding: 14px 16px; }
+  .tile .n { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+  .tile .k { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #E4EDE4; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 700; white-space: nowrap; }
+  tbody tr:hover { background: var(--pale-green); }
+  td.id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  td.when { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge.complete { background: #DDF0DA; color: #245C22; }
+  .badge.pending  { background: #FDF0D2; color: #7A5A00; }
+  .badge.action   { background: #E1E8F7; color: var(--navy); }
+  .badge.unknown  { background: #EDEDED; color: #555; }
+
+  .table-scroll { overflow-x: auto; }
+  #message { margin-top: 12px; font-size: 14px; }
+  #message.error { color: var(--danger); }
+  #message.info { color: var(--muted); }
+  .empty { padding: 32px 12px; text-align: center; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Vendor Responses</h1>
+      <div class="subtle">Whole Foods packaging data outreach</div>
+    </div>
+    <div class="row" style="align-items:center;">
+      <span class="subtle" id="lastLoaded"></span>
+      <button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <div class="card" id="authCard">
+    <form id="authForm">
+      <label for="token">Admin token</label>
+      <div class="row">
+        <div class="grow">
+          <input type="password" id="token" autocomplete="current-password"
+                 placeholder="Paste the ADMIN_TOKEN from your Vercel environment variables" style="width:100%">
+        </div>
+        <button type="submit" id="loadBtn">Load responses</button>
+      </div>
+    </form>
+    <div id="message"></div>
+  </div>
+
+  <div id="dashboard" hidden>
+    <div class="card">
+      <div class="tiles" id="tiles"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:16px;">
+        <div class="grow">
+          <label for="search">Search</label>
+          <input type="search" id="search" placeholder="Vendor name or ID" style="width:100%">
+        </div>
+        <div>
+          <label for="filterChoice">Response</label>
+          <select id="filterChoice">
+            <option value="">All</option>
+            <option value="template">Spreadsheet template</option>
+            <option value="ehalo_self">eHalo themselves</option>
+            <option value="working_session">Working session</option>
+            <option value="send_docs">Sending documents</option>
+            <option value="__none">No choice recorded</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterStatus">Status</label>
+          <select id="filterStatus">
+            <option value="">All</option>
+            <option value="complete">Complete</option>
+            <option value="pending">Needs follow-up</option>
+          </select>
+        </div>
+        <button type="button" class="secondary" id="refreshBtn">Refresh</button>
+        <button type="button" class="secondary" id="csvBtn">Download CSV</button>
+        <button type="button" id="xlsxBtn">Download Excel</button>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>How they'll respond</th>
+              <th>Timeframe</th>
+              <th>Status</th>
+              <th>First response</th>
+              <th>Last update</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CHOICE_LABELS = {
+    template: 'Spreadsheet template',
+    ehalo_self: 'eHalo themselves',
+    working_session: 'Working session',
+    send_docs: 'Sending documents'
+  };
+
+  const TIMEFRAME_LABELS = {
+    this_week: 'This week',
+    next_two_weeks: 'Next 2 weeks',
+    need_more_time: 'Needs more time'
+  };
+
+  // Only the two spreadsheet-style choices lead to a timeframe screen, so only
+  // those can be waiting on one.
+  const NEEDS_TIMEFRAME = ['template', 'ehalo_self'];
+
+  const el = (id) => document.getElementById(id);
+  const authForm = el('authForm');
+  const tokenInput = el('token');
+  const messageEl = el('message');
+  const dashboard = el('dashboard');
+  const tbody = el('tbody');
+
+  let responses = [];
+
+  // sessionStorage rather than localStorage: the token clears when the tab
+  // closes instead of persisting on a possibly shared machine.
+  const savedToken = sessionStorage.getItem('wf_admin_token');
+  if (savedToken) {
+    tokenInput.value = savedToken;
+    load();
+  }
+
+  function setMessage(type, text) {
+    messageEl.className = type || '';
+    messageEl.textContent = text || '';
+  }
+
+  function statusFor(row) {
+    if (!row.choice) return { key: 'pending', cls: 'unknown', text: 'No choice recorded' };
+    if (NEEDS_TIMEFRAME.includes(row.choice)) {
+      return row.timeframe
+        ? { key: 'complete', cls: 'complete', text: 'Complete' }
+        : { key: 'pending', cls: 'pending', text: 'Timeframe pending' };
+    }
+    if (row.choice === 'working_session') return { key: 'pending', cls: 'action', text: 'Awaiting booking' };
+    return { key: 'pending', cls: 'action', text: 'Awaiting documents' };
+  }
+
+  function timeframeText(row) {
+    if (!row.timeframe) return '';
+    return TIMEFRAME_LABELS[row.timeframe] || row.timeframe;
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+  }
+
+  async function request(path) {
+    const token = tokenInput.value.trim();
+    if (!token) throw new Error('Enter the admin token first.');
+    const response = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    if (response.status === 401) throw new Error('That token was not accepted.');
+    if (!response.ok) {
+      let detail = '';
+      try {
+        detail = (await response.json()).error || '';
+      } catch (err) { /* non-JSON error body */ }
+      throw new Error(detail || ('Request failed with ' + response.status));
+    }
+    return response;
+  }
+
+  authForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    load();
+  });
+  el('refreshBtn').addEventListener('click', load);
+  el('search').addEventListener('input', render);
+  el('filterChoice').addEventListener('change', render);
+  el('filterStatus').addEventListener('change', render);
+  el('csvBtn').addEventListener('click', () => download('csv'));
+  el('xlsxBtn').addEventListener('click', () => download('xlsx'));
+
+  async function load() {
+    el('loadBtn').disabled = true;
+    setMessage('info', 'Loading...');
+    try {
+      const response = await request('/api/export?format=json');
+      const body = await response.json();
+      responses = body.responses || [];
+      sessionStorage.setItem('wf_admin_token', tokenInput.value.trim());
+      setMessage('', '');
+      dashboard.hidden = false;
+      el('authCard').hidden = true;
+      el('signOutBtn').hidden = false;
+      el('lastLoaded').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      render();
+    } catch (err) {
+      dashboard.hidden = true;
+      el('authCard').hidden = false;
+      el('signOutBtn').hidden = true;
+      sessionStorage.removeItem('wf_admin_token');
+      setMessage('error', err.message);
+    } finally {
+      el('loadBtn').disabled = false;
+    }
+  }
+
+  el('signOutBtn').addEventListener('click', function () {
+    sessionStorage.removeItem('wf_admin_token');
+    tokenInput.value = '';
+    responses = [];
+    dashboard.hidden = true;
+    el('authCard').hidden = false;
+    el('signOutBtn').hidden = true;
+    el('lastLoaded').textContent = '';
+    setMessage('', '');
+    tokenInput.focus();
+  });
+
+  async function download(format) {
+    const button = format === 'csv' ? el('csvBtn') : el('xlsxBtn');
+    button.disabled = true;
+    try {
+      // Fetched with the token as a header, rather than linking to
+      // ?token=..., so it stays out of browser history and referrers.
+      const response = await request('/api/export?format=' + format);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'vendor-responses-' + new Date().toISOString().slice(0, 10) + '.' + format;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage('error', err.message);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function visibleRows() {
+    const term = el('search').value.trim().toLowerCase();
+    const choice = el('filterChoice').value;
+    const status = el('filterStatus').value;
+
+    return responses.filter(function (row) {
+      if (term) {
+        const haystack = ((row.vendor_name || '') + ' ' + (row.vendor_id || '')).toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      if (choice === '__none') {
+        if (row.choice) return false;
+      } else if (choice && row.choice !== choice) {
+        return false;
+      }
+      if (status && statusFor(row).key !== status) return false;
+      return true;
+    });
+  }
+
+  function renderTiles() {
+    const total = responses.length;
+    const complete = responses.filter((r) => statusFor(r).key === 'complete').length;
+    const counts = {};
+    for (const row of responses) {
+      if (row.choice) counts[row.choice] = (counts[row.choice] || 0) + 1;
+    }
+
+    const tiles = [
+      { n: total, k: 'Vendors responded' },
+      { n: complete, k: 'Complete' },
+      { n: total - complete, k: 'Need follow-up' },
+      ...Object.keys(CHOICE_LABELS).map((key) => ({ n: counts[key] || 0, k: CHOICE_LABELS[key] }))
+    ];
+
+    el('tiles').innerHTML = '';
+    for (const tile of tiles) {
+      const div = document.createElement('div');
+      div.className = 'tile';
+      const n = document.createElement('div');
+      n.className = 'n';
+      n.textContent = String(tile.n);
+      const k = document.createElement('div');
+      k.className = 'k';
+      k.textContent = tile.k;
+      div.append(n, k);
+      el('tiles').append(div);
+    }
+  }
+
+  function render() {
+    renderTiles();
+
+    const rows = visibleRows();
+    tbody.innerHTML = '';
+
+    for (const row of rows) {
+      const status = statusFor(row);
+      const tr = document.createElement('tr');
+
+      const vendor = document.createElement('td');
+      const name = document.createElement('div');
+      name.textContent = row.vendor_name || '(no name)';
+      const id = document.createElement('div');
+      id.className = 'subtle';
+      id.textContent = row.vendor_id;
+      vendor.append(name, id);
+
+      const choice = document.createElement('td');
+      choice.textContent = row.choice ? (CHOICE_LABELS[row.choice] || row.choice) : '';
+
+      const timeframe = document.createElement('td');
+      timeframe.textContent = timeframeText(row);
+
+      const statusCell = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + status.cls;
+      badge.textContent = status.text;
+      statusCell.append(badge);
+
+      const first = document.createElement('td');
+      first.className = 'when';
+      first.textContent = formatDate(row.first_seen_at);
+
+      const last = document.createElement('td');
+      last.className = 'when';
+      last.textContent = formatDate(row.last_updated_at);
+
+      tr.append(vendor, choice, timeframe, statusCell, first, last);
+      tbody.append(tr);
+    }
+
+    const empty = el('emptyState');
+    if (!rows.length) {
+      empty.hidden = false;
+      empty.textContent = responses.length
+        ? 'No vendors match these filters.'
+        : 'No responses yet. They will appear here as vendors click through.';
+    } else {
+      empty.hidden = true;
+    }
+  }
+</script>
+</body>
+</html>

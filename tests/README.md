@@ -1,6 +1,6 @@
 # Tests
 
-Five suites, 109 checks. Three need nothing but Node; two also need a browser.
+Six suites, 130 checks. Three need nothing but Node; three also need a browser.
 
 ```bash
 npm test           # xlsx writer, API against Postgres, Apps Script backend
@@ -48,6 +48,12 @@ and the rate limit engaging and being disableable.
 database. Both screens, the date picker, the booking link arriving from the API rather
 than page source, signed and unsigned links, a deliberately broken backend still producing
 the error state, and the export reflecting exactly what the browser submitted.
+
+**`admin.test.mjs`** — the dashboard in headless Chrome. A wrong token revealing nothing;
+the summary tiles and per-vendor status badges; search and both filters; the export request
+carrying the token as a header and never in a URL; the token living in `sessionStorage`
+rather than `localStorage` and surviving a reload; sign-out clearing it; a vendor name
+containing markup being escaped rather than rendered; and no overflow on a phone.
 
 **`page.test.mjs`** — the page against a mock webhook, which is how it behaves when pointed
 at n8n or Apps Script instead of the bundled API. Covers the Task 2 and Task 5 checklists in
