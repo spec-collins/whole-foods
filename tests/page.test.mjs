@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = path.join(ROOT, 'index.html');
+const SRC = path.join(ROOT, 'public/index.html');
 
 // The repo has no package.json by design, so puppeteer is expected to live in
 // a scratch directory. Resolve it from PUPPETEER_DIR or the current working
@@ -53,15 +53,24 @@ const webhook = http.createServer((req, res) => {
 await new Promise((r) => webhook.listen(0, '127.0.0.1', r));
 const WEBHOOK_URL = `http://127.0.0.1:${webhook.address().port}/hook`;
 
-function buildPage({ live }) {
-  let html = fs.readFileSync(SRC, 'utf8');
-  if (live) {
-    html = html.replace('"REPLACE_WITH_N8N_PRODUCTION_WEBHOOK_URL"', JSON.stringify(WEBHOOK_URL));
+const CONFIGURED_URL = '"/api/respond"';
+
+/**
+ * "live" points the page at the mock webhook; "unconfigured" swaps in an
+ * unreplaced placeholder to prove the page fails safely when nobody has set
+ * the endpoint. Also covers pointing the page at an external webhook (n8n or
+ * Apps Script) rather than the bundled API.
+ */
+function buildPage(mode) {
+  const html = fs.readFileSync(SRC, 'utf8');
+  if (!html.includes(CONFIGURED_URL)) {
+    throw new Error(`index.html no longer contains ${CONFIGURED_URL}; update this test.`);
   }
-  return html;
+  if (mode === 'live') return html.replace(CONFIGURED_URL, JSON.stringify(WEBHOOK_URL));
+  return html.replace(CONFIGURED_URL, '"REPLACE_WITH_WEBHOOK_URL"');
 }
 
-let currentHtml = buildPage({ live: false });
+let currentHtml = buildPage('unconfigured');
 const site = http.createServer((req, res) => {
   // Mirror Vercel: only the page path exists, everything else 404s.
   const path = new URL(req.url, 'http://x').pathname;
@@ -97,13 +106,13 @@ const visible = (page, sel) =>
 // ---------------------------------------------------------------------------
 // Task 2: dead-webhook smoke test (placeholder WEBHOOK_URL still in place)
 // ---------------------------------------------------------------------------
-currentHtml = buildPage({ live: false });
+currentHtml = buildPage('unconfigured');
 
 {
   const page = await newPage();
   await page.goto(`${SITE}/?vid=TEST123&name=Test%20Vendor`);
   check(
-    'dead: vendor name renders from ?name=',
+    'unconfigured: vendor name renders from ?name=',
     (await page.$eval('#vendorName', (el) => el.textContent)) === 'Test Vendor'
   );
 
@@ -114,10 +123,10 @@ currentHtml = buildPage({ live: false });
     const fallbackShown = await visible(page, '#fallback');
     const reEnabled = await page.$$eval('#stepChoice .option-btn', (b) => b.every((x) => !x.disabled));
     const stillOnChoice = await visible(page, '#stepChoice');
-    check(`dead: ${choice} shows error + fallback + re-enabled buttons`, fallbackShown && reEnabled && stillOnChoice,
+    check(`unconfigured: ${choice} shows error + fallback + re-enabled buttons`, fallbackShown && reEnabled && stillOnChoice,
       `fallback=${fallbackShown} reEnabled=${reEnabled} onChoice=${stillOnChoice}`);
   }
-  check('dead: no unhandled page errors', page.pageErrors.length === 0, page.pageErrors.join(' | '));
+  check('unconfigured: no unhandled page errors', page.pageErrors.length === 0, page.pageErrors.join(' | '));
   await page.close();
 }
 
@@ -135,7 +144,7 @@ currentHtml = buildPage({ live: false });
 // ---------------------------------------------------------------------------
 // Task 5: end-to-end against a live mock webhook
 // ---------------------------------------------------------------------------
-currentHtml = buildPage({ live: true });
+currentHtml = buildPage('live');
 webhookMode = 'ok';
 
 check('live build: real scheduling URL is NOT in page source', !currentHtml.includes(REAL_SCHEDULING_URL));

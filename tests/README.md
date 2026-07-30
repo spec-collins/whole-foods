@@ -1,44 +1,63 @@
 # Tests
 
-Optional dev tooling. The site itself has no dependencies and no build step; these scripts
-exist so the Task 2 and Task 5 checklists in `../CURSOR_BUILD_SPEC.md` can be re-run
-automatically after any edit, rather than clicked through by hand every time.
-
-They deliberately live outside the deployed site and there is no `package.json` in this
-repo, so install the one dependency in a scratch directory:
+Five suites, 109 checks. Three need nothing but Node; two also need a browser.
 
 ```bash
-mkdir -p /tmp/wf-test && cd /tmp/wf-test
-npm init -y && npm install puppeteer
-npx puppeteer browsers install chrome
-cd -                       # back to the repo root
-
-PUPPETEER_DIR=/tmp/wf-test node tests/page.test.mjs
-node tests/apps-script.test.mjs   # no dependencies at all
+npm test           # xlsx writer, API against Postgres, Apps Script backend
+npm run test:browser   # the real page in headless Chrome (see setup below)
 ```
 
-## `page.test.mjs`
+## Setup
 
-Starts a mock webhook and a static server, then drives `index.html` in headless Chrome:
+The API and end-to-end suites **drop and recreate their two tables**, so point them at
+a scratch database, never the production one. Either set `TEST_DATABASE_URL` or let them
+fall back to `DATABASE_URL` from your `.env`.
 
-- **Dead webhook (Task 2)** — vendor name renders from `?name=`; all four choices show the
-  red error state, reveal the fallback contact line, and re-enable the buttons; no unhandled
-  JS errors.
-- **Live webhook (Task 5)** — both `stage: "choice"` and `stage: "timeframe"` payloads match
-  the contract; `template` and `ehalo_self` are the only choices that advance to the
-  timeframe screen; the three presets and the date picker all post; `working_session` sets
-  the booking `href` only after a successful response and the real URL is absent from page
-  source; `send_docs` is a dead end.
-- **Failure handling** — a 500 from the webhook at either stage shows the error state and
-  re-enables the buttons.
-- **Mobile** — no horizontal overflow at 320px and choice buttons stay at least 44px tall.
+A local Postgres is enough:
 
-## `apps-script.test.mjs`
+```bash
+sudo apt-get install -y postgresql-16
+sudo pg_ctlcluster 16 main start
+sudo -u postgres psql -c "create role wf login password 'wfpass' superuser;" \
+                     -c "create database wf_vendor owner wf;"
+export TEST_DATABASE_URL=postgres://wf:wfpass@127.0.0.1:5432/wf_vendor
+```
 
-Runs `backend/google-apps-script.gs` against stubbed `SpreadsheetApp`, `LockService`,
-`PropertiesService`, and `ContentService`. Verifies that a choice and a timeframe for the
-same `vendor_id` land on one upserted row, that a different vendor inserts a new row, that
-re-submitting a choice does not wipe an existing timeframe, that every payload is captured
-in the audit log, and that malformed input is rejected without throwing.
+Puppeteer is kept out of `package.json` so Vercel deployments don't install a browser.
+Put it in a scratch directory instead:
 
-Neither script touches the network beyond localhost, so both are safe to run offline.
+```bash
+mkdir -p /tmp/wf-test && cd /tmp/wf-test && npm init -y && npm install puppeteer
+npx puppeteer browsers install chrome
+cd -
+PUPPETEER_DIR=/tmp/wf-test npm run test:browser
+```
+
+## What each suite covers
+
+**`api.test.mjs`** — the serverless handlers against real Postgres. A choice and a
+timeframe for one vendor merging onto a single upserted row; a resubmitted choice not
+wiping an existing timeframe; a new `vendor_id` inserting; every payload landing in the
+append-only event log with a hashed rather than raw IP; rejection of unknown stages,
+out-of-range choices, malformed timeframes, bad JSON, oversized bodies and wrong methods,
+with nothing written on rejection; the export's auth, formats and download headers;
+signed-link enforcement, including that one vendor's token can't be reused for another;
+and the rate limit engaging and being disableable.
+
+**`e2e.test.mjs`** — the real page in headless Chrome against the real handlers and a real
+database. Both screens, the date picker, the booking link arriving from the API rather
+than page source, signed and unsigned links, a deliberately broken backend still producing
+the error state, and the export reflecting exactly what the browser submitted.
+
+**`page.test.mjs`** — the page against a mock webhook, which is how it behaves when pointed
+at n8n or Apps Script instead of the bundled API. Covers the Task 2 and Task 5 checklists in
+`../CURSOR_BUILD_SPEC.md`: unconfigured-endpoint safety, per-choice branching, payload
+contracts, failure handling at both stages, and a 320px viewport.
+
+**`xlsx.test.mjs`** — round-trips the hand-rolled workbook writer using only `node:zlib`.
+Guards the escaping that a vendor named "Bob & Co" would otherwise break, plus the
+container details Excel is strict about. Output was also verified independently against
+openpyxl during development.
+
+**`apps-script.test.mjs`** — the optional Google Sheets backend against stubbed Google
+services, for the deployment that doesn't use Postgres.
