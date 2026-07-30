@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whole Foods Packaging Data - Response</title>
+<style>
+  :root {
+    --forest-green: #2D6B2F;
+    --leaf-green: #52A83A;
+    --navy: #1D3461;
+    --sage: #A8CEA8;
+    --pale-green: #EFF6EF;
+    --off-white: #F5F8F2;
+    --charcoal: #1A2A1A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--off-white);
+    color: var(--charcoal);
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--sage);
+    border-radius: 10px;
+    max-width: 560px;
+    width: 100%;
+    padding: 32px 28px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  h1 { font-size: 20px; color: var(--forest-green); margin: 0 0 4px; }
+  .vendor-name { font-size: 15px; color: var(--charcoal); margin: 0 0 20px; }
+  p.intro, p.step-intro { font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+  .option-btn {
+    display: block; width: 100%; text-align: left;
+    background: var(--pale-green); border: 1px solid var(--sage); border-radius: 8px;
+    padding: 16px; margin-bottom: 12px; font-size: 15px; color: var(--charcoal);
+    cursor: pointer; transition: background 0.15s, border-color 0.15s; text-decoration: none;
+  }
+  .option-btn:hover:not(:disabled) { background: var(--sage); border-color: var(--forest-green); }
+  .option-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .option-btn strong { display: block; color: var(--navy); margin-bottom: 2px; }
+  .date-row { display: flex; gap: 8px; margin-top: 4px; }
+  .date-row input[type="date"] { flex: 1; padding: 12px; border: 1px solid var(--sage); border-radius: 8px; font-size: 14px; }
+  .date-row button { background: var(--forest-green); color: #fff; border: none; border-radius: 8px; padding: 0 18px; font-size: 14px; cursor: pointer; }
+  .date-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { margin-top: 20px; font-size: 14px; display: none; }
+  #status.success { color: var(--forest-green); font-weight: 600; display: block; }
+  #status.error { color: #B3261E; display: block; }
+  #status.loading { color: var(--navy); display: block; }
+  .fallback { margin-top: 16px; font-size: 13px; color: var(--charcoal); display: none; }
+  .done-message { font-size: 15px; color: var(--forest-green); font-weight: 600; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Whole Foods Packaging Data</h1>
+    <p class="vendor-name" id="vendorName"></p>
+
+    <div id="stepChoice">
+      <p class="intro">Let us know how you would like to provide your packaging component data. One click and you are done; we will follow up based on what you choose.</p>
+      <button class="option-btn" data-choice="template">
+        <strong>I'll fill out the spreadsheet template</strong>
+        Send me the template. I'll complete it and send it back.
+      </button>
+      <button class="option-btn" data-choice="ehalo_self">
+        <strong>I'll enter the data into eHalo myself</strong>
+        I already have, or can get, eHalo access.
+      </button>
+      <button class="option-btn" data-choice="working_session">
+        <strong>I'd like a working session</strong>
+        Walk me through entering the data live, together.
+      </button>
+      <button class="option-btn" data-choice="send_docs">
+        <strong>I'll send you our documents</strong>
+        Send spec sheets or PDFs and let SpecInsite enter the data for us.
+      </button>
+    </div>
+
+    <div id="stepTimeframe" style="display:none;">
+      <p class="step-intro">Good. One more quick one: when do you think you'll have this done? An estimate is fine, and picking one of these does not lock you in.</p>
+      <button class="option-btn" data-timeframe="this_week"><strong>This week</strong></button>
+      <button class="option-btn" data-timeframe="next_two_weeks"><strong>Next 2 weeks</strong></button>
+      <button class="option-btn" data-timeframe="need_more_time"><strong>Need more time</strong></button>
+      <p class="step-intro" style="margin-top:16px; margin-bottom:8px;">Or pick a specific date:</p>
+      <div class="date-row">
+        <input type="date" id="timeframeDate">
+        <button id="useDateBtn" type="button">Use this date</button>
+      </div>
+    </div>
+
+    <div id="stepSchedule" style="display:none;">
+      <p class="step-intro">Got it. Grab a time that works for you and we'll walk through it together.</p>
+      <a id="calendlyLink" class="option-btn" href="#" target="_blank" rel="noopener" style="text-align:center;">
+        <strong>Schedule your working session</strong>
+      </a>
+    </div>
+
+    <div id="stepDocsReply" style="display:none;">
+      <p class="done-message">Just reply to this email with your documents attached (spec sheets or PDFs) and we'll take it from there.</p>
+    </div>
+
+    <div id="stepDone" style="display:none;">
+      <p class="done-message" id="doneMessage"></p>
+    </div>
+
+    <div id="status"></div>
+    <div class="fallback" id="fallback">
+      Having trouble? Email <a href="mailto:wholefoods@specinsite.com">wholefoods@specinsite.com</a> or call <span id="fallbackPhone">REPLACE_WITH_PHONE</span> and we will take care of it.
+    </div>
+  </div>
+
+<script>
+  // ===== CONFIG =====
+  const WEBHOOK_URL = "REPLACE_WITH_N8N_PRODUCTION_WEBHOOK_URL";
+  const CALENDLY_URL = "REPLACE_WITH_CALENDLY_OR_BOOKINGS_URL";
+  // ===================
+
+  const params = new URLSearchParams(window.location.search);
+  const vendorId = params.get('vid') || 'unknown';
+  const vendorNameRaw = params.get('name') || '';
+  const vendorName = vendorNameRaw ? decodeURIComponent(vendorNameRaw) : '';
+
+  if (vendorName) {
+    document.getElementById('vendorName').textContent = vendorName;
+  }
+
+  const steps = {
+    choice: document.getElementById('stepChoice'),
+    timeframe: document.getElementById('stepTimeframe'),
+    schedule: document.getElementById('stepSchedule'),
+    docsReply: document.getElementById('stepDocsReply'),
+    done: document.getElementById('stepDone')
+  };
+
+  const statusEl = document.getElementById('status');
+  const fallbackEl = document.getElementById('fallback');
+  const doneMessageEl = document.getElementById('doneMessage');
+  const calendlyLink = document.getElementById('calendlyLink');
+
+  function showStep(name) {
+    Object.keys(steps).forEach(function (key) {
+      steps[key].style.display = (key === name) ? 'block' : 'none';
+    });
+  }
+
+  function setStatus(type, message) {
+    statusEl.className = type || '';
+    statusEl.textContent = message || '';
+  }
+
+  function clearStatus() {
+    statusEl.className = '';
+    statusEl.textContent = '';
+  }
+
+  async function postToWebhook(payload) {
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error('Server responded with ' + response.status);
+    }
+  }
+
+  const choiceButtons = steps.choice.querySelectorAll('.option-btn');
+
+  choiceButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const choice = btn.getAttribute('data-choice');
+      const label = btn.querySelector('strong').textContent;
+      submitChoice(choice, label);
+    });
+  });
+
+  async function submitChoice(choice, label) {
+    choiceButtons.forEach(function (b) { b.disabled = true; });
+    setStatus('loading', 'Sending your response...');
+
+    const payload = {
+      stage: 'choice',
+      vendor_id: vendorId,
+      vendor_name: vendorName,
+      choice: choice,
+      choice_label: label,
+      submitted_at: new Date().toISOString()
+    };
+
+    try {
+      await postToWebhook(payload);
+      clearStatus();
+
+      if (choice === 'template' || choice === 'ehalo_self') {
+        showStep('timeframe');
+      } else if (choice === 'working_session') {
+        calendlyLink.href = CALENDLY_URL;
+        showStep('schedule');
+      } else if (choice === 'send_docs') {
+        showStep('docsReply');
+      } else {
+        showStep('done');
+        doneMessageEl.textContent = 'Thanks, that is recorded.';
+      }
+    } catch (err) {
+      setStatus('error', 'Something went wrong sending your response. Please try again in a moment.');
+      fallbackEl.style.display = 'block';
+      choiceButtons.forEach(function (b) { b.disabled = false; });
+    }
+  }
+
+  const timeframeButtons = steps.timeframe.querySelectorAll('.option-btn[data-timeframe]');
+  const timeframeDateInput = document.getElementById('timeframeDate');
+  const useDateBtn = document.getElementById('useDateBtn');
+
+  timeframeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const value = btn.getAttribute('data-timeframe');
+      const label = btn.querySelector('strong').textContent;
+      submitTimeframe(value, label);
+    });
+  });
+
+  useDateBtn.addEventListener('click', function () {
+    if (!timeframeDateInput.value) {
+      setStatus('error', 'Pick a date first, then click Use this date.');
+      return;
+    }
+    submitTimeframe(timeframeDateInput.value, 'Specific date: ' + timeframeDateInput.value);
+  });
+
+  async function submitTimeframe(value, label) {
+    timeframeButtons.forEach(function (b) { b.disabled = true; });
+    useDateBtn.disabled = true;
+    setStatus('loading', 'Saving your timeframe...');
+
+    const payload = {
+      stage: 'timeframe',
+      vendor_id: vendorId,
+      vendor_name: vendorName,
+      timeframe: value,
+      timeframe_label: label,
+      timeframe_submitted_at: new Date().toISOString()
+    };
+
+    try {
+      await postToWebhook(payload);
+      clearStatus();
+      showStep('done');
+      doneMessageEl.textContent = 'Thanks. We will follow up around then.';
+    } catch (err) {
+      setStatus('error', 'Your response method is already saved. We had trouble saving the timeframe; feel free to try again, or we will just follow up directly.');
+      fallbackEl.style.display = 'block';
+      timeframeButtons.forEach(function (b) { b.disabled = false; });
+      useDateBtn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
