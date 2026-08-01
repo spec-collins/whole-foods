@@ -108,14 +108,17 @@
     </div>
 
     <div id="stepSchedule" style="display:none;">
-      <p class="step-intro">Got it. Grab a time that works for you and we'll walk through it together.</p>
+      <p class="step-intro" id="scheduleIntro">Got it. Grab a time that works for you and we'll walk through it together.</p>
       <a id="calendlyLink" class="option-btn" href="#" target="_blank" rel="noopener" style="text-align:center;">
         <strong>Schedule your working session</strong>
       </a>
+      <p class="done-message" id="scheduleNoLink" style="display:none;">
+        Got it, a working session it is. We'll email you a few times that work and get it on the calendar.
+      </p>
     </div>
 
     <div id="stepDocsReply" style="display:none;">
-      <p class="done-message">Just reply to this email with your documents attached (spec sheets or PDFs) and we'll take it from there.</p>
+      <p class="done-message">Just reply to this email with your documents attached (spec sheets or PDFs) and we'll take it from there. You can also send them to <a href="mailto:wfm-amazongrocery@specinsite.com">wfm-amazongrocery@specinsite.com</a>.</p>
     </div>
 
     <div id="stepDone" style="display:none;">
@@ -124,7 +127,7 @@
 
     <div id="status" role="status" aria-live="polite"></div>
     <div class="fallback" id="fallback">
-      Having trouble? Email <a href="mailto:wholefoods@specinsite.com">wholefoods@specinsite.com</a> or call <span id="fallbackPhone">REPLACE_WITH_PHONE</span> and we will take care of it.
+      Having trouble? Email <a href="mailto:wfm-amazongrocery@specinsite.com">wfm-amazongrocery@specinsite.com</a> and we will take care of it.
     </div>
   </div>
 
@@ -165,6 +168,20 @@
   const fallbackEl = document.getElementById('fallback');
   const doneMessageEl = document.getElementById('doneMessage');
   const calendlyLink = document.getElementById('calendlyLink');
+
+  /**
+   * The booking link may not exist yet. Rather than render a dead button,
+   * acknowledge the choice and promise a follow-up: it is already recorded, so
+   * the vendor is done either way.
+   */
+  function showSchedulingStep(url) {
+    const hasLink = Boolean(url);
+    if (hasLink) calendlyLink.href = url;
+    calendlyLink.style.display = hasLink ? 'block' : 'none';
+    document.getElementById('scheduleIntro').style.display = hasLink ? 'block' : 'none';
+    document.getElementById('scheduleNoLink').style.display = hasLink ? 'none' : 'block';
+    showStep('schedule');
+  }
 
   function showStep(name) {
     Object.keys(steps).forEach(function (key) {
@@ -207,12 +224,14 @@
     }
   }
 
-  // Only accept http(s) so a malformed webhook response can't inject a
-  // javascript: URL into the scheduling link.
+  // Requires an absolute http(s) URL. Absolute because a booking link always
+  // points at an external tool, so parsing without a base rejects an
+  // unreplaced placeholder that would otherwise resolve to a path on this
+  // site. http(s) so a malformed response can't inject a javascript: URL.
   function safeHttpUrl(value) {
     if (typeof value !== 'string' || !value) return null;
     try {
-      const parsed = new URL(value, window.location.href);
+      const parsed = new URL(value);
       return (parsed.protocol === 'https:' || parsed.protocol === 'http:') ? parsed.href : null;
     } catch (err) {
       return null;
@@ -250,11 +269,10 @@
       if (choice === 'template' || choice === 'ehalo_self') {
         showStep('timeframe');
       } else if (choice === 'working_session') {
-        // Prefer a scheduling_url returned by the webhook so the real booking
+        // Prefer a scheduling_url returned by the backend so the real booking
         // link never has to sit in the page source; fall back to the config
-        // constant when the webhook does not supply one.
-        calendlyLink.href = safeHttpUrl(result && result.scheduling_url) || CALENDLY_URL;
-        showStep('schedule');
+        // constant when the backend does not supply one.
+        showSchedulingStep(safeHttpUrl(result && result.scheduling_url) || safeHttpUrl(CALENDLY_URL));
       } else if (choice === 'send_docs') {
         showStep('docsReply');
       } else {

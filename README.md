@@ -84,9 +84,13 @@ vercel --prod
 No build step. Vercel serves `public/` as the site and turns each file in `api/` into a
 function automatically.
 
-The remaining placeholders in `public/index.html` are `REPLACE_WITH_PHONE` in the fallback
-contact line and `REPLACE_WITH_CALENDLY_OR_BOOKINGS_URL`, which is only a fallback for when
-`SCHEDULING_URL` isn't set.
+The only placeholder left in `public/index.html` is `REPLACE_WITH_CALENDLY_OR_BOOKINGS_URL`,
+and it is just a fallback for when `SCHEDULING_URL` isn't set. If neither is a real URL, the
+working-session screen says a time will be emailed instead of rendering a dead button, so the
+page is safe to ship before the booking link exists.
+
+The contact address `wfm-amazongrocery@specinsite.com` appears twice in
+`public/index.html`, on the send-documents screen and in the failure fallback line.
 
 ## How responses are stored
 

@@ -116,6 +116,30 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
   await page.close();
 }
 
+// The booking link may not exist yet; the choice must still be recorded and
+// the vendor must not be shown a dead button.
+{
+  const original = process.env.SCHEDULING_URL;
+  delete process.env.SCHEDULING_URL;
+
+  const page = await open('vid=E2E-nolink&name=Acme');
+  await page.click('[data-choice="working_session"]');
+  await shown(page, '#stepSchedule');
+
+  const state = await page.evaluate(() => ({
+    linkHidden: window.getComputedStyle(document.querySelector('#calendlyLink')).display === 'none',
+    message: document.querySelector('#scheduleNoLink').textContent.trim(),
+    messageShown: window.getComputedStyle(document.querySelector('#scheduleNoLink')).display !== 'none',
+  }));
+  check('with no booking link configured, the dead button is hidden and a follow-up promised',
+    state.linkHidden && state.messageShown && /email you/i.test(state.message), state.message);
+  check('the working session choice is recorded even without a booking link',
+    (await rowFor('E2E-nolink')).choice === 'working_session');
+  await page.close();
+
+  process.env.SCHEDULING_URL = original;
+}
+
 // The dead-end choice.
 {
   const page = await open('vid=E2E-docs&name=Acme');
@@ -123,6 +147,12 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
   await shown(page, '#stepDocsReply');
   check('send_docs stores the choice and shows the reply-to-email screen',
     (await rowFor('E2E-docs')).choice === 'send_docs');
+
+  const contact = await page.$eval('#stepDocsReply', (el) => el.textContent);
+  const mailto = await page.$eval('#stepDocsReply a', (el) => el.getAttribute('href'));
+  check('the send-documents screen names the current contact address',
+    contact.includes('wfm-amazongrocery@specinsite.com') && mailto === 'mailto:wfm-amazongrocery@specinsite.com',
+    mailto);
   await page.close();
 }
 
@@ -158,7 +188,14 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
   await page.click('[data-choice="template"]');
   await page.waitForFunction(() => document.querySelector('#status').className === 'error', { timeout: 5000 });
   const reEnabled = await page.$$eval('#stepChoice .option-btn', (b) => b.every((x) => !x.disabled));
+  const fallback = await page.evaluate(() => ({
+    shown: window.getComputedStyle(document.querySelector('#fallback')).display !== 'none',
+    text: document.querySelector('#fallback').textContent.trim(),
+  }));
   check('a backend failure shows the error state and re-enables the buttons', reEnabled);
+  check('the failure fallback gives the contact address and no placeholder phone number',
+    fallback.shown && fallback.text.includes('wfm-amazongrocery@specinsite.com') && !/REPLACE_WITH/.test(fallback.text),
+    fallback.text);
   await page.close();
 
   await query(fs.readFileSync(path.join(ROOT, 'lib/schema.sql'), 'utf8'));
@@ -170,7 +207,7 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
   const body = await res.json();
   const ids = body.responses.map((r) => r.vendor_id).sort();
   check('the export lists every vendor the browser submitted',
-    ids.join(',') === 'E2E-1,E2E-date,E2E-docs,E2E-signed,E2E-ws', ids.join(','));
+    ids.join(',') === 'E2E-1,E2E-date,E2E-docs,E2E-nolink,E2E-signed,E2E-ws', ids.join(','));
 
   const xlsx = Buffer.from(
     await (await fetch(`${BASE}/api/export?format=xlsx&token=e2e-admin-token`)).arrayBuffer()
