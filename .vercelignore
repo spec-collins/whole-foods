@@ -1,0 +1,5 @@
+# Keep test and alternative-backend files out of the deployment. Nothing in
+# api/ imports them, so excluding them does not affect the build.
+tests/
+backend/
+CURSOR_BUILD_SPEC.md
