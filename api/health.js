@@ -1,4 +1,4 @@
-import { query, UNDEFINED_TABLE } from '../lib/db.js';
+import { query, UNDEFINED_TABLE, resolveConnectionString } from '../lib/db.js';
 import { sendJson } from '../lib/http.js';
 
 /**
@@ -12,8 +12,13 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
   }
 
+  const url = resolveConnectionString();
   const config = {
-    database_url_set: Boolean(process.env.DATABASE_URL),
+    database_url_set: Boolean(url),
+    // Serverless should be on the provider's pooled endpoint. Flagging this
+    // here turns a subtle connection-exhaustion problem under load into
+    // something visible before the first email goes out.
+    database_pooled: url ? url.includes('-pooler') : null,
     admin_token_set: Boolean(process.env.ADMIN_TOKEN),
     scheduling_url_set: Boolean(process.env.SCHEDULING_URL),
     link_signing_enabled: Boolean(process.env.LINK_SIGNING_SECRET),

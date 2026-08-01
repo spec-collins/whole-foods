@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadLocalEnv, ROOT } from '../lib/env.js';
-import { query, closePool } from '../lib/db.js';
+import { query, closePool, resolveConnectionString } from '../lib/db.js';
 
 loadLocalEnv();
 
-if (!process.env.DATABASE_URL) {
+if (!resolveConnectionString()) {
   console.error('DATABASE_URL is not set. Put it in .env or export it before running.');
   process.exit(1);
 }
