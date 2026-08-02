@@ -116,8 +116,8 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
   await page.close();
 }
 
-// The booking link may not exist yet; the choice must still be recorded and
-// the vendor must not be shown a dead button.
+// The shipping configuration for this round: no booking tool, so the step must
+// ask for availability by email rather than render a dead button.
 {
   const original = process.env.SCHEDULING_URL;
   delete process.env.SCHEDULING_URL;
@@ -128,12 +128,17 @@ const rowFor = async (id) => (await query('SELECT * FROM vendor_responses WHERE 
 
   const state = await page.evaluate(() => ({
     linkHidden: window.getComputedStyle(document.querySelector('#calendlyLink')).display === 'none',
-    message: document.querySelector('#scheduleNoLink').textContent.trim(),
+    message: document.querySelector('#scheduleNoLink').textContent.replace(/\s+/g, ' ').trim(),
     messageShown: window.getComputedStyle(document.querySelector('#scheduleNoLink')).display !== 'none',
+    mailto: document.querySelector('#scheduleNoLink a').getAttribute('href'),
   }));
-  check('with no booking link configured, the dead button is hidden and a follow-up promised',
-    state.linkHidden && state.messageShown && /email you/i.test(state.message), state.message);
-  check('the working session choice is recorded even without a booking link',
+  check('with no booking tool, the dead button is hidden and availability is requested by email',
+    state.linkHidden && state.messageShown && /reply to this email/i.test(state.message) &&
+    /times that work/i.test(state.message),
+    state.message);
+  check('the working session step gives the contact address',
+    state.mailto === 'mailto:wfm-amazongrocery@specinsite.com', state.mailto);
+  check('the working session choice is recorded even without a booking tool',
     (await rowFor('E2E-nolink')).choice === 'working_session');
   await page.close();
 
