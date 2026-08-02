@@ -11,7 +11,7 @@
     "dev": "node scripts/dev-server.mjs",
     "migrate": "node scripts/migrate.mjs",
     "links": "node scripts/make-links.mjs",
-    "test": "node tests/xlsx.test.mjs && node tests/api.test.mjs && node tests/apps-script.test.mjs",
+    "test": "node tests/xlsx.test.mjs && node tests/migrate.test.mjs && node tests/api.test.mjs && node tests/apps-script.test.mjs",
     "test:browser": "node tests/page.test.mjs && node tests/e2e.test.mjs && node tests/admin.test.mjs"
   },
   "dependencies": {

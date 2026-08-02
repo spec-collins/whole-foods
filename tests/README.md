@@ -1,6 +1,6 @@
 # Tests
 
-Six suites, 130 checks. Three need nothing but Node; three also need a browser.
+Seven suites, 149 checks. Four need nothing but Node; three also need a browser.
 
 ```bash
 npm test           # xlsx writer, API against Postgres, Apps Script backend
@@ -9,9 +9,12 @@ npm run test:browser   # the real page in headless Chrome (see setup below)
 
 ## Setup
 
-The API and end-to-end suites **drop and recreate their two tables**, so point them at
-a scratch database, never the production one. Either set `TEST_DATABASE_URL` or let them
-fall back to `DATABASE_URL` from your `.env`.
+Four suites **drop and recreate their tables**, so they require `TEST_DATABASE_URL` to be
+set explicitly and deliberately will **not** fall back to `DATABASE_URL`. That fallback used
+to exist and was a live hazard: once a production connection string is in the environment —
+which it is, as soon as anyone runs these with real credentials in scope — a stray `npm test`
+would wipe the tracker. A non-local host additionally needs `ALLOW_NONLOCAL_TEST_DB=1`, so
+reaching a hosted database takes two deliberate acts rather than one slip.
 
 A local Postgres is enough:
 
@@ -34,6 +37,15 @@ PUPPETEER_DIR=/tmp/wf-test npm run test:browser
 ```
 
 ## What each suite covers
+
+**`migrate.test.mjs`** — the migration against real Postgres. Migrating an empty database,
+re-running safely, and the case that matters: an earlier prototype of this project created a
+`vendor_responses` table with the same name but `created_at`/`updated_at` instead of
+`first_seen_at`/`last_updated_at`. `CREATE TABLE IF NOT EXISTS` is a no-op against it, so the
+suite proves the migration converges the columns, preserves existing rows and the prototype's
+own columns, and that the API can then read and write both new and inherited rows. Also
+proves a genuinely incompatible table of the same name fails loudly rather than reporting
+success.
 
 **`api.test.mjs`** — the serverless handlers against real Postgres. A choice and a
 timeframe for one vendor merging onto a single upserted row; a resubmitted choice not

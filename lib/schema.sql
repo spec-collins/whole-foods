@@ -37,3 +37,25 @@ CREATE INDEX IF NOT EXISTS response_events_vendor_idx
 -- Supports the per-IP rate limit lookup in /api/respond.
 CREATE INDEX IF NOT EXISTS response_events_ip_recent_idx
   ON response_events (ip_hash, received_at DESC);
+
+-- CREATE TABLE IF NOT EXISTS is a no-op when a table of that name already
+-- exists with a different shape, which would let the migration report success
+-- while leaving the API broken on a missing column. An earlier prototype of
+-- this project created a vendor_responses table with created_at/updated_at
+-- instead of first_seen_at/last_updated_at, so converge the columns explicitly.
+-- Every statement below is a no-op on a table this schema already built.
+ALTER TABLE vendor_responses
+  ADD COLUMN IF NOT EXISTS vendor_name            TEXT,
+  ADD COLUMN IF NOT EXISTS choice                 TEXT,
+  ADD COLUMN IF NOT EXISTS choice_label           TEXT,
+  ADD COLUMN IF NOT EXISTS choice_submitted_at    TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS timeframe              TEXT,
+  ADD COLUMN IF NOT EXISTS timeframe_label        TEXT,
+  ADD COLUMN IF NOT EXISTS timeframe_submitted_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS first_seen_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS last_updated_at        TIMESTAMPTZ NOT NULL DEFAULT now();
+
+ALTER TABLE response_events
+  ADD COLUMN IF NOT EXISTS ip_hash     TEXT,
+  ADD COLUMN IF NOT EXISTS user_agent  TEXT,
+  ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ NOT NULL DEFAULT now();

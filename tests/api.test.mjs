@@ -1,21 +1,18 @@
 /**
  * Integration tests for the serverless API against a real Postgres database.
  *
- * Requires TEST_DATABASE_URL (or DATABASE_URL) pointing at a database you are
- * happy to have wiped -- the suite drops and recreates its two tables. See
- * tests/README.md for a local Postgres recipe.
+ * Requires TEST_DATABASE_URL pointing at a scratch database -- the suite drops
+ * and recreates its tables, and deliberately will not fall back to
+ * DATABASE_URL. See tests/README.md.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { useScratchDatabase } from './support/scratch-db.mjs';
 
 loadLocalEnv();
 
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-if (!process.env.DATABASE_URL) {
-  console.error('Set TEST_DATABASE_URL or DATABASE_URL to run the API tests.');
-  process.exit(1);
-}
+useScratchDatabase();
 
 process.env.ADMIN_TOKEN = 'test-admin-token';
 process.env.SCHEDULING_URL = 'https://booking.example.test/working-session';

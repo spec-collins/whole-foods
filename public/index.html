@@ -68,6 +68,7 @@
   .fallback { margin-top: 16px; font-size: 13px; line-height: 1.5; color: var(--charcoal); display: none; }
   .fallback a { color: var(--forest-green); }
   .done-message { font-size: 15px; color: var(--forest-green); font-weight: 600; line-height: 1.5; }
+  .done-message a { color: inherit; }
 </style>
 </head>
 <body>
@@ -113,7 +114,9 @@
         <strong>Schedule your working session</strong>
       </a>
       <p class="done-message" id="scheduleNoLink" style="display:none;">
-        Got it, a working session it is. We'll email you a few times that work and get it on the calendar.
+        Got it, a working session it is. Reply to this email with a couple of times that work
+        for you and we'll get it on the calendar. You can also reach us at
+        <a href="mailto:wfm-amazongrocery@specinsite.com">wfm-amazongrocery@specinsite.com</a>.
       </p>
     </div>
 
@@ -136,8 +139,6 @@
   // Same-origin serverless function backed by Postgres. Point this at an
   // absolute URL instead to post to n8n or a Google Apps Script web app.
   const WEBHOOK_URL = "/api/respond";
-  // Only used when the backend does not return a scheduling_url of its own.
-  const CALENDLY_URL = "REPLACE_WITH_CALENDLY_OR_BOOKINGS_URL";
   // Body is always JSON. The header is configurable because a Google Apps
   // Script web app rejects the CORS preflight that "application/json"
   // triggers; "text/plain;charset=utf-8" keeps the request preflight-free.
@@ -170,9 +171,9 @@
   const calendlyLink = document.getElementById('calendlyLink');
 
   /**
-   * The booking link may not exist yet. Rather than render a dead button,
-   * acknowledge the choice and promise a follow-up: it is already recorded, so
-   * the vendor is done either way.
+   * There is no booking tool in this round, so this almost always takes the
+   * no-link path: acknowledge the choice and ask for availability by email. The
+   * choice is already recorded either way, so the vendor is finished.
    */
   function showSchedulingStep(url) {
     const hasLink = Boolean(url);
@@ -269,10 +270,11 @@
       if (choice === 'template' || choice === 'ehalo_self') {
         showStep('timeframe');
       } else if (choice === 'working_session') {
-        // Prefer a scheduling_url returned by the backend so the real booking
-        // link never has to sit in the page source; fall back to the config
-        // constant when the backend does not supply one.
-        showSchedulingStep(safeHttpUrl(result && result.scheduling_url) || safeHttpUrl(CALENDLY_URL));
+        // No booking tool this round, so this normally resolves to null and the
+        // step asks for availability by email. Setting SCHEDULING_URL on the
+        // backend later turns the button on with no change here, and keeps the
+        // booking link out of the page source.
+        showSchedulingStep(safeHttpUrl(result && result.scheduling_url));
       } else if (choice === 'send_docs') {
         showStep('docsReply');
       } else {
