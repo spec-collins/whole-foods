@@ -1,21 +1,18 @@
 /**
  * Drives public/admin.html in headless Chrome against the real API and a real
- * Postgres database. Requires TEST_DATABASE_URL (or DATABASE_URL) for a
- * database that can be wiped, plus puppeteer. See tests/README.md.
+ * Postgres database. Requires TEST_DATABASE_URL pointing at a scratch
+ * database, plus puppeteer. See tests/README.md.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { useScratchDatabase } from './support/scratch-db.mjs';
 
 loadLocalEnv();
 
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-if (!process.env.DATABASE_URL) {
-  console.error('Set TEST_DATABASE_URL or DATABASE_URL to run the admin tests.');
-  process.exit(1);
-}
+useScratchDatabase();
 
 process.env.ADMIN_TOKEN = 'admin-ui-token';
 process.env.RATE_LIMIT_PER_MINUTE = '0';

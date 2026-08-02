@@ -7,22 +7,19 @@
  * against it, so without the ALTER statements the migration would report
  * success and every vendor click would then fail on a missing column.
  *
- * Requires TEST_DATABASE_URL (or DATABASE_URL) for a database that can be
- * wiped. See tests/README.md.
+ * Requires TEST_DATABASE_URL pointing at a scratch database. See
+ * tests/README.md.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { useScratchDatabase } from './support/scratch-db.mjs';
 
 loadLocalEnv();
 
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-if (!process.env.DATABASE_URL) {
-  console.error('Set TEST_DATABASE_URL or DATABASE_URL to run the migration tests.');
-  process.exit(1);
-}
+useScratchDatabase();
 
 const run = promisify(execFile);
 const { query, closePool } = await import('../lib/db.js');

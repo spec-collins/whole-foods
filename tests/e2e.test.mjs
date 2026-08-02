@@ -3,22 +3,19 @@
  * serverless handlers, writing to a real Postgres database.
  *
  * tests/page.test.mjs covers the page against a mock webhook; this covers the
- * whole path end to end. Requires TEST_DATABASE_URL (or DATABASE_URL) for a
- * database that can be wiped, and puppeteer. See tests/README.md.
+ * whole path end to end. Requires TEST_DATABASE_URL pointing at a scratch
+ * database, and puppeteer. See tests/README.md.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { useScratchDatabase } from './support/scratch-db.mjs';
 
 loadLocalEnv();
 
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-if (!process.env.DATABASE_URL) {
-  console.error('Set TEST_DATABASE_URL or DATABASE_URL to run the end-to-end tests.');
-  process.exit(1);
-}
+useScratchDatabase();
 
 const SCHEDULING_URL = 'https://booking.example.test/specinsite/working-session';
 process.env.ADMIN_TOKEN = 'e2e-admin-token';

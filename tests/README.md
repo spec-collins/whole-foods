@@ -9,9 +9,12 @@ npm run test:browser   # the real page in headless Chrome (see setup below)
 
 ## Setup
 
-The API and end-to-end suites **drop and recreate their two tables**, so point them at
-a scratch database, never the production one. Either set `TEST_DATABASE_URL` or let them
-fall back to `DATABASE_URL` from your `.env`.
+Four suites **drop and recreate their tables**, so they require `TEST_DATABASE_URL` to be
+set explicitly and deliberately will **not** fall back to `DATABASE_URL`. That fallback used
+to exist and was a live hazard: once a production connection string is in the environment —
+which it is, as soon as anyone runs these with real credentials in scope — a stray `npm test`
+would wipe the tracker. A non-local host additionally needs `ALLOW_NONLOCAL_TEST_DB=1`, so
+reaching a hosted database takes two deliberate acts rather than one slip.
 
 A local Postgres is enough:
 
