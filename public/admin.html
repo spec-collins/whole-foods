@@ -25,7 +25,7 @@
     padding: 24px 16px 64px;
     font-size: 14px;
   }
-  .wrap { max-width: 1120px; margin: 0 auto; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
   header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
   h1 { font-size: 20px; color: var(--forest-green); margin: 0; }
   .subtle { color: var(--muted); font-size: 13px; }
@@ -91,6 +91,26 @@
     color: var(--navy); border: 1px solid var(--sage);
   }
   button.flag-btn.is-test-btn { color: #6B4A1E; border-color: #D4B896; }
+
+  td.notes { min-width: 220px; max-width: 320px; }
+  .notes-text {
+    white-space: pre-wrap; word-break: break-word;
+    font-size: 13px; line-height: 1.35; margin-bottom: 8px; min-height: 1.2em;
+  }
+  .notes-text.empty { color: var(--muted); font-style: italic; }
+  .notes-edit textarea {
+    width: 100%; min-height: 88px; resize: vertical;
+    padding: 8px 10px; border: 1px solid var(--sage); border-radius: 8px;
+    font-size: 13px; font-family: inherit; color: var(--charcoal); background: #fff;
+    margin-bottom: 8px;
+  }
+  .notes-edit textarea:focus-visible {
+    outline: 2px solid var(--forest-green); outline-offset: 2px;
+  }
+  .notes-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .notes-actions button { padding: 6px 10px; font-size: 12px; }
+  .notes-status { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .notes-status.error { color: var(--danger); }
 
   .table-scroll { overflow-x: auto; }
   #message { margin-top: 12px; font-size: 14px; }
@@ -181,6 +201,7 @@
               <th>Status</th>
               <th>First response</th>
               <th>Last update</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -217,6 +238,8 @@
   const tbody = el('tbody');
 
   let responses = [];
+  // vendor_id -> true while that row's note textarea is open for editing
+  const editingNotes = new Set();
 
   // sessionStorage rather than localStorage: the token clears when the tab
   // closes instead of persisting on a possibly shared machine.
@@ -294,6 +317,7 @@
       const response = await request('/api/export?format=json');
       const body = await response.json();
       responses = body.responses || [];
+      editingNotes.clear();
       sessionStorage.setItem('wf_admin_token', tokenInput.value.trim());
       setMessage('', '');
       dashboard.hidden = false;
@@ -316,6 +340,7 @@
     sessionStorage.removeItem('wf_admin_token');
     tokenInput.value = '';
     responses = [];
+    editingNotes.clear();
     dashboard.hidden = true;
     el('authCard').hidden = false;
     el('signOutBtn').hidden = true;
@@ -392,6 +417,88 @@
     render();
   }
 
+  async function saveVendorNotes(vendorId, notes) {
+    const response = await request('/api/vendor-notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_id: vendorId, notes })
+    });
+    const body = await response.json();
+    const idx = responses.findIndex((r) => r.vendor_id === vendorId);
+    if (idx >= 0) responses[idx].notes = body.vendor.notes || '';
+    editingNotes.delete(vendorId);
+    render();
+  }
+
+  function buildNotesCell(row) {
+    const cell = document.createElement('td');
+    cell.className = 'notes';
+    const vendorId = row.vendor_id;
+    const current = row.notes || '';
+    const isEditing = editingNotes.has(vendorId);
+
+    if (isEditing) {
+      const edit = document.createElement('div');
+      edit.className = 'notes-edit';
+      const area = document.createElement('textarea');
+      area.value = current;
+      area.maxLength = 4000;
+      area.setAttribute('aria-label', 'Note for ' + (row.vendor_name || vendorId));
+      const actions = document.createElement('div');
+      actions.className = 'notes-actions';
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.textContent = 'Save';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'secondary';
+      cancelBtn.textContent = 'Cancel';
+      const status = document.createElement('div');
+      status.className = 'notes-status';
+
+      saveBtn.addEventListener('click', async function () {
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        status.className = 'notes-status';
+        status.textContent = 'Saving...';
+        try {
+          await saveVendorNotes(vendorId, area.value);
+        } catch (err) {
+          status.className = 'notes-status error';
+          status.textContent = err.message;
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      });
+      cancelBtn.addEventListener('click', function () {
+        editingNotes.delete(vendorId);
+        render();
+      });
+
+      actions.append(saveBtn, cancelBtn);
+      edit.append(area, actions, status);
+      cell.append(edit);
+      return cell;
+    }
+
+    const text = document.createElement('div');
+    text.className = 'notes-text' + (current ? '' : ' empty');
+    text.textContent = current || 'No note yet';
+    const actions = document.createElement('div');
+    actions.className = 'notes-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'secondary';
+    editBtn.textContent = current ? 'Edit' : 'Add note';
+    editBtn.addEventListener('click', function () {
+      editingNotes.add(vendorId);
+      render();
+    });
+    actions.append(editBtn);
+    cell.append(text, actions);
+    return cell;
+  }
+
   function renderTiles() {
     const real = responses.filter((r) => !r.is_test);
     const tests = responses.filter((r) => r.is_test);
@@ -440,7 +547,7 @@
         const sep = document.createElement('tr');
         sep.className = 'test-separator';
         const sepCell = document.createElement('td');
-        sepCell.colSpan = 7;
+        sepCell.colSpan = 8;
         sepCell.textContent = 'Test vendors';
         sep.append(sepCell);
         tbody.append(sep);
@@ -500,7 +607,9 @@
       last.className = 'when';
       last.textContent = formatDate(row.last_updated_at);
 
-      tr.append(vendor, kind, choice, timeframe, statusCell, first, last);
+      const notes = buildNotesCell(row);
+
+      tr.append(vendor, kind, choice, timeframe, statusCell, first, last, notes);
       tbody.append(tr);
     }
 

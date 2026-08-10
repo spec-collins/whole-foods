@@ -20,6 +20,7 @@ const REQUIRED = {
     'choice', 'choice_label', 'choice_submitted_at',
     'timeframe', 'timeframe_label', 'timeframe_submitted_at',
     'is_test',
+    'notes',
     'first_seen_at', 'last_updated_at',
   ],
   response_events: ['id', 'vendor_id', 'stage', 'payload', 'ip_hash', 'user_agent', 'received_at'],

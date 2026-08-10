@@ -200,6 +200,51 @@ const tiles = () =>
   await page.$eval('#search', (el) => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); });
 }
 
+{
+  // Add / overwrite a staff note on one vendor.
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    if (harbor) harbor.querySelector('td.notes button').click();
+  });
+  await page.waitForSelector('#tbody tr:not(.test-separator) td.notes textarea', { timeout: 5000 });
+  await page.$eval('#tbody tr:not(.test-separator) td.notes textarea', (el) => {
+    el.value = 'Called vendor; waiting on packaging PDF.';
+  });
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    const save = [...harbor.querySelectorAll('td.notes button')].find((b) => b.textContent === 'Save');
+    if (save) save.click();
+  });
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('#tbody tr:not(.test-separator)')];
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    return harbor
+      && !harbor.querySelector('td.notes textarea')
+      && harbor.querySelector('td.notes .notes-text')?.textContent.includes('waiting on packaging PDF');
+  }, { timeout: 5000 });
+  check('admin notes can be saved on a vendor row', true);
+
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    if (harbor) harbor.querySelector('td.notes button').click();
+  });
+  await page.waitForSelector('#tbody tr:not(.test-separator) td.notes textarea', { timeout: 5000 });
+  await page.$eval('#tbody tr:not(.test-separator) td.notes textarea', (el) => {
+    el.value = 'Updated note: docs received.';
+  });
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    const save = [...harbor.querySelectorAll('td.notes button')].find((b) => b.textContent === 'Save');
+    if (save) save.click();
+  });
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('#tbody tr:not(.test-separator)')];
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    return harbor?.querySelector('td.notes .notes-text')?.textContent.includes('docs received');
+  }, { timeout: 5000 });
+  check('admin notes can be overwritten', true);
+}
+
 // Downloads are fetched with the token as a header, so it must not appear in
 // any request URL.
 {

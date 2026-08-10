@@ -13,6 +13,7 @@ const COLUMNS = [
   'timeframe_label',
   'timeframe_submitted_at',
   'is_test',
+  'notes',
   'first_seen_at',
   'last_updated_at',
 ];

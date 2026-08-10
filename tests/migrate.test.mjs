@@ -94,7 +94,7 @@ await query(
 
   const after = await columnsOf('vendor_responses');
   check('the missing columns are added',
-    after.includes('first_seen_at') && after.includes('last_updated_at') && after.includes('is_test'), after.join(', '));
+    after.includes('first_seen_at') && after.includes('last_updated_at') && after.includes('is_test') && after.includes('notes'), after.join(', '));
   check("the prototype's own columns are left alone rather than dropped",
     after.includes('created_at') && after.includes('updated_at'));
   check('the event log table is created alongside', (await columnsOf('response_events')).length > 0);
