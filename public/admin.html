@@ -69,6 +69,16 @@
   .badge.pending  { background: #FDF0D2; color: #7A5A00; }
   .badge.action   { background: #E1E8F7; color: var(--navy); }
   .badge.unknown  { background: #EDEDED; color: #555; }
+  .badge.real     { background: #DDF0DA; color: #245C22; }
+  .badge.test     { background: #F0E6DA; color: #6B4A1E; }
+
+  tbody tr.is-test { background: #FAF6F0; }
+  tbody tr.is-test:hover { background: #F3EBE0; }
+  button.flag-btn {
+    padding: 6px 10px; font-size: 12px; background: #fff;
+    color: var(--navy); border: 1px solid var(--sage);
+  }
+  button.flag-btn.is-test-btn { color: #6B4A1E; border-color: #D4B896; }
 
   .table-scroll { overflow-x: auto; }
   #message { margin-top: 12px; font-size: 14px; }
@@ -135,6 +145,14 @@
             <option value="pending">Needs follow-up</option>
           </select>
         </div>
+        <div>
+          <label for="filterKind">Vendor type</label>
+          <select id="filterKind">
+            <option value="">All</option>
+            <option value="real">Real only</option>
+            <option value="test">Test only</option>
+          </select>
+        </div>
         <button type="button" class="secondary" id="refreshBtn">Refresh</button>
         <button type="button" class="secondary" id="csvBtn">Download CSV</button>
         <button type="button" id="xlsxBtn">Download Excel</button>
@@ -145,6 +163,7 @@
           <thead>
             <tr>
               <th>Vendor</th>
+              <th>Type</th>
               <th>How they'll respond</th>
               <th>Timeframe</th>
               <th>Status</th>
@@ -225,10 +244,14 @@
     });
   }
 
-  async function request(path) {
+  async function request(path, options = {}) {
     const token = tokenInput.value.trim();
     if (!token) throw new Error('Enter the admin token first.');
-    const response = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    const headers = Object.assign(
+      { Authorization: 'Bearer ' + token },
+      options.headers || {}
+    );
+    const response = await fetch(path, Object.assign({}, options, { headers }));
     if (response.status === 401) throw new Error('That token was not accepted.');
     if (!response.ok) {
       let detail = '';
@@ -248,6 +271,7 @@
   el('search').addEventListener('input', render);
   el('filterChoice').addEventListener('change', render);
   el('filterStatus').addEventListener('change', render);
+  el('filterKind').addEventListener('change', render);
   el('csvBtn').addEventListener('click', () => download('csv'));
   el('xlsxBtn').addEventListener('click', () => download('xlsx'));
 
@@ -315,8 +339,9 @@
     const term = el('search').value.trim().toLowerCase();
     const choice = el('filterChoice').value;
     const status = el('filterStatus').value;
+    const kind = el('filterKind').value;
 
-    return responses.filter(function (row) {
+    const filtered = responses.filter(function (row) {
       if (term) {
         const haystack = ((row.vendor_name || '') + ' ' + (row.vendor_id || '')).toLowerCase();
         if (!haystack.includes(term)) return false;
@@ -327,22 +352,48 @@
         return false;
       }
       if (status && statusFor(row).key !== status) return false;
+      if (kind === 'test' && !row.is_test) return false;
+      if (kind === 'real' && row.is_test) return false;
       return true;
+    });
+
+    // Real vendors first; Test vendors always sink to the bottom.
+    return filtered.sort(function (a, b) {
+      const aTest = a.is_test ? 1 : 0;
+      const bTest = b.is_test ? 1 : 0;
+      if (aTest !== bTest) return aTest - bTest;
+      const aTime = a.last_updated_at ? new Date(a.last_updated_at).getTime() : 0;
+      const bTime = b.last_updated_at ? new Date(b.last_updated_at).getTime() : 0;
+      return bTime - aTime;
     });
   }
 
+  async function setVendorKind(vendorId, isTest) {
+    const response = await request('/api/vendor-flag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_id: vendorId, is_test: isTest })
+    });
+    const body = await response.json();
+    const idx = responses.findIndex((r) => r.vendor_id === vendorId);
+    if (idx >= 0) responses[idx].is_test = body.vendor.is_test;
+    render();
+  }
+
   function renderTiles() {
-    const total = responses.length;
-    const complete = responses.filter((r) => statusFor(r).key === 'complete').length;
+    const real = responses.filter((r) => !r.is_test);
+    const tests = responses.filter((r) => r.is_test);
+    const complete = real.filter((r) => statusFor(r).key === 'complete').length;
     const counts = {};
-    for (const row of responses) {
+    for (const row of real) {
       if (row.choice) counts[row.choice] = (counts[row.choice] || 0) + 1;
     }
 
     const tiles = [
-      { n: total, k: 'Vendors responded' },
-      { n: complete, k: 'Complete' },
-      { n: total - complete, k: 'Need follow-up' },
+      { n: real.length, k: 'Real vendors' },
+      { n: complete, k: 'Complete (real)' },
+      { n: real.length - complete, k: 'Need follow-up (real)' },
+      { n: tests.length, k: 'Test vendors' },
       ...Object.keys(CHOICE_LABELS).map((key) => ({ n: counts[key] || 0, k: CHOICE_LABELS[key] }))
     ];
 
@@ -369,7 +420,9 @@
 
     for (const row of rows) {
       const status = statusFor(row);
+      const isTest = Boolean(row.is_test);
       const tr = document.createElement('tr');
+      if (isTest) tr.classList.add('is-test');
 
       const vendor = document.createElement('td');
       const name = document.createElement('div');
@@ -378,6 +431,28 @@
       id.className = 'subtle';
       id.textContent = row.vendor_id;
       vendor.append(name, id);
+
+      const kind = document.createElement('td');
+      const kindBadge = document.createElement('span');
+      kindBadge.className = 'badge ' + (isTest ? 'test' : 'real');
+      kindBadge.textContent = isTest ? 'Test' : 'Real';
+      kindBadge.style.display = 'block';
+      kindBadge.style.marginBottom = '6px';
+      kindBadge.style.width = 'fit-content';
+      const flagBtn = document.createElement('button');
+      flagBtn.type = 'button';
+      flagBtn.className = 'flag-btn' + (isTest ? '' : ' is-test-btn');
+      flagBtn.textContent = isTest ? 'Mark Real' : 'Mark Test';
+      flagBtn.addEventListener('click', async function () {
+        flagBtn.disabled = true;
+        try {
+          await setVendorKind(row.vendor_id, !isTest);
+        } catch (err) {
+          setMessage('error', err.message);
+          flagBtn.disabled = false;
+        }
+      });
+      kind.append(kindBadge, flagBtn);
 
       const choice = document.createElement('td');
       choice.textContent = row.choice ? (CHOICE_LABELS[row.choice] || row.choice) : '';
@@ -399,7 +474,7 @@
       last.className = 'when';
       last.textContent = formatDate(row.last_updated_at);
 
-      tr.append(vendor, choice, timeframe, statusCell, first, last);
+      tr.append(vendor, kind, choice, timeframe, statusCell, first, last);
       tbody.append(tr);
     }
 

@@ -12,6 +12,7 @@ const COLUMNS = [
   'timeframe',
   'timeframe_label',
   'timeframe_submitted_at',
+  'is_test',
   'first_seen_at',
   'last_updated_at',
 ];
@@ -43,7 +44,9 @@ export default async function handler(req, res) {
   let rows;
   try {
     ({ rows } = await query(
-      `SELECT ${COLUMNS.join(', ')} FROM vendor_responses ORDER BY last_updated_at DESC`
+      `SELECT ${COLUMNS.join(', ')}
+         FROM vendor_responses
+        ORDER BY is_test ASC, last_updated_at DESC`
     ));
   } catch (err) {
     if (err && err.code === UNDEFINED_TABLE) {
@@ -81,5 +84,6 @@ export default async function handler(req, res) {
 
 function formatCell(value) {
   if (value === null || value === undefined) return '';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
   return value instanceof Date ? value.toISOString() : String(value);
 }

@@ -92,7 +92,7 @@ const tiles = () =>
 {
   const t = await tiles();
   check('summary tiles count vendors and completion',
-    t['Vendors responded'] === '5' && t['Complete'] === '1' && t['Need follow-up'] === '4', JSON.stringify(t));
+    t['Real vendors'] === '5' && t['Complete (real)'] === '1' && t['Need follow-up (real)'] === '4', JSON.stringify(t));
   check('summary tiles break down by choice',
     t['Spreadsheet template'] === '1' && t['Working session'] === '1' && t['Sending documents'] === '1',
     JSON.stringify(t));
@@ -124,7 +124,8 @@ const tiles = () =>
 {
   await page.select('#filterStatus', 'complete');
   await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
-  check('the status filter isolates completed vendors', (await badges())[0] === 'Complete');
+  check('the status filter isolates completed vendors',
+    (await page.$eval('#tbody .badge.complete', (b) => b.textContent)) === 'Complete');
 
   await page.select('#filterStatus', '');
   await page.select('#filterChoice', '__none');
@@ -135,6 +136,47 @@ const tiles = () =>
   await page.select('#filterChoice', '');
   await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 5, { timeout: 5000 });
   check('clearing the filters restores every row', (await rowCount()) === 5);
+}
+
+{
+  // Mark one vendor as Test; it should move below all Real rows.
+  await page.$$eval('#tbody tr', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    if (harbor) harbor.querySelector('button.flag-btn').click();
+  });
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('#tbody tr')];
+    if (rows.length !== 5) return false;
+    const last = rows[rows.length - 1];
+    return last.classList.contains('is-test') && last.textContent.includes('Harbor Provisions');
+  }, { timeout: 5000 });
+  check('Mark Test sinks that vendor below all Real vendors', true);
+
+  const t = await tiles();
+  check('tiles exclude Test vendors from Real counts',
+    t['Real vendors'] === '4' && t['Test vendors'] === '1', JSON.stringify(t));
+
+  await page.select('#filterKind', 'test');
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
+  check('Vendor type filter can show Test only',
+    (await page.$eval('#tbody tr', (r) => r.textContent)).includes('Harbor Provisions'));
+
+  await page.select('#filterKind', 'real');
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 4, { timeout: 5000 });
+  check('Vendor type filter can show Real only', (await rowCount()) === 4);
+
+  await page.select('#filterKind', '');
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 5, { timeout: 5000 });
+
+  // Toggle back so later checks that expect 5 unmarked rows stay simple.
+  await page.$$eval('#tbody tr', (rows) => {
+    const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
+    if (harbor) harbor.querySelector('button.flag-btn').click();
+  });
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('#tbody tr')];
+    return rows.length === 5 && rows.every((r) => !r.classList.contains('is-test'));
+  }, { timeout: 5000 });
 }
 
 {

@@ -4,3 +4,7 @@ node_modules/
 .env.*
 !.env.example
 *.log
+GO_LIVE_SECRETS.local.md
+*_SECRETS.local.md
+.vercel
+.env*

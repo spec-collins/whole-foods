@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS vendor_responses (
   timeframe               TEXT,
   timeframe_label         TEXT,
   timeframe_submitted_at  TIMESTAMPTZ,
+  is_test                 BOOLEAN NOT NULL DEFAULT false,
   first_seen_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -52,6 +53,7 @@ ALTER TABLE vendor_responses
   ADD COLUMN IF NOT EXISTS timeframe              TEXT,
   ADD COLUMN IF NOT EXISTS timeframe_label        TEXT,
   ADD COLUMN IF NOT EXISTS timeframe_submitted_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS is_test                BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS first_seen_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS last_updated_at        TIMESTAMPTZ NOT NULL DEFAULT now();
 
