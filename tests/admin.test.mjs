@@ -66,7 +66,7 @@ page.on('pageerror', (e) => pageErrors.push(String(e)));
 await page.setViewport({ width: 1280, height: 900 });
 await page.goto(`${BASE}/admin.html`);
 
-const rowCount = () => page.$$eval('#tbody tr', (rows) => rows.length);
+const rowCount = () => page.$$eval('#tbody tr:not(.test-separator)', (rows) => rows.length);
 const badges = () => page.$$eval('#tbody .badge', (b) => b.map((x) => x.textContent));
 const tiles = () =>
   page.$$eval('#tiles .tile', (t) => Object.fromEntries(t.map((x) => [x.querySelector('.k').textContent, x.querySelector('.n').textContent])));
@@ -109,73 +109,82 @@ const tiles = () =>
 
 {
   await page.type('#search', 'harbor');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
-  const text = await page.$eval('#tbody tr', (r) => r.textContent);
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 1, { timeout: 5000 });
+  const text = await page.$eval('#tbody tr:not(.test-separator)', (r) => r.textContent);
   check('search filters by vendor name', text.includes('Harbor Provisions'), text.trim().slice(0, 40));
 
   await page.$eval('#search', (el) => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.type('#search', 'V-docs');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
-  check('search also matches the vendor ID', (await page.$eval('#tbody tr', (r) => r.textContent)).includes('Northfield'));
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 1, { timeout: 5000 });
+  check('search also matches the vendor ID', (await page.$eval('#tbody tr:not(.test-separator)', (r) => r.textContent)).includes('Northfield'));
 
   await page.$eval('#search', (el) => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); });
 }
 
 {
   await page.select('#filterStatus', 'complete');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 1, { timeout: 5000 });
   check('the status filter isolates completed vendors',
     (await page.$eval('#tbody .badge.complete', (b) => b.textContent)) === 'Complete');
 
   await page.select('#filterStatus', '');
   await page.select('#filterChoice', '__none');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 1, { timeout: 5000 });
   check('the choice filter can isolate vendors with no choice recorded',
-    (await page.$eval('#tbody tr', (r) => r.textContent)).includes('Orphan Timeframe Co'));
+    (await page.$eval('#tbody tr:not(.test-separator)', (r) => r.textContent)).includes('Orphan Timeframe Co'));
 
   await page.select('#filterChoice', '');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 5, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 5, { timeout: 5000 });
   check('clearing the filters restores every row', (await rowCount()) === 5);
 }
 
 {
   // Mark one vendor as Test; it should move below all Real rows.
-  await page.$$eval('#tbody tr', (rows) => {
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
     const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
     if (harbor) harbor.querySelector('button.flag-btn').click();
   });
   await page.waitForFunction(() => {
-    const rows = [...document.querySelectorAll('#tbody tr')];
+    const rows = [...document.querySelectorAll('#tbody tr:not(.test-separator)')];
     if (rows.length !== 5) return false;
     const last = rows[rows.length - 1];
-    return last.classList.contains('is-test') && last.textContent.includes('Harbor Provisions');
+    const sep = document.querySelector('#tbody tr.test-separator');
+    return last.classList.contains('is-test')
+      && last.textContent.includes('Harbor Provisions')
+      && !!sep;
   }, { timeout: 5000 });
   check('Mark Test sinks that vendor below all Real vendors', true);
+  check('a separator row divides Real vendors from Test vendors',
+    (await page.$eval('#tbody tr.test-separator', (r) => r.textContent)).includes('Test vendors'));
 
   const t = await tiles();
   check('tiles exclude Test vendors from Real counts',
     t['Real vendors'] === '4' && t['Test vendors'] === '1', JSON.stringify(t));
 
   await page.select('#filterKind', 'test');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 1, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 1, { timeout: 5000 });
   check('Vendor type filter can show Test only',
-    (await page.$eval('#tbody tr', (r) => r.textContent)).includes('Harbor Provisions'));
+    (await page.$eval('#tbody tr:not(.test-separator)', (r) => r.textContent)).includes('Harbor Provisions'));
 
   await page.select('#filterKind', 'real');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 4, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 4, { timeout: 5000 });
   check('Vendor type filter can show Real only', (await rowCount()) === 4);
+  check('Real-only filter hides the Test separator',
+    (await page.$$('#tbody tr.test-separator')).length === 0);
 
   await page.select('#filterKind', '');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 5, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 5, { timeout: 5000 });
 
   // Toggle back so later checks that expect 5 unmarked rows stay simple.
-  await page.$$eval('#tbody tr', (rows) => {
+  await page.$$eval('#tbody tr:not(.test-separator)', (rows) => {
     const harbor = rows.find((r) => r.textContent.includes('Harbor Provisions'));
     if (harbor) harbor.querySelector('button.flag-btn').click();
   });
   await page.waitForFunction(() => {
-    const rows = [...document.querySelectorAll('#tbody tr')];
-    return rows.length === 5 && rows.every((r) => !r.classList.contains('is-test'));
+    const rows = [...document.querySelectorAll('#tbody tr:not(.test-separator)')];
+    return rows.length === 5
+      && rows.every((r) => !r.classList.contains('is-test'))
+      && !document.querySelector('#tbody tr.test-separator');
   }, { timeout: 5000 });
 }
 
@@ -246,9 +255,9 @@ const tiles = () =>
     choice: 'template', choice_label: 'Template', submitted_at: new Date().toISOString(),
   });
   await page.click('#refreshBtn');
-  await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 6, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#tbody tr:not(.test-separator)').length === 6, { timeout: 5000 });
   const injected = await page.$$eval('#tbody img', (imgs) => imgs.length);
-  const shownAsText = await page.$$eval('#tbody tr', (rows) =>
+  const shownAsText = await page.$$eval('#tbody tr:not(.test-separator)', (rows) =>
     rows.some((r) => r.textContent.includes('<img src=x onerror=alert(1)>')));
   check('a vendor name containing markup is escaped, not rendered',
     injected === 0 && shownAsText, `imgs=${injected} asText=${shownAsText}`);

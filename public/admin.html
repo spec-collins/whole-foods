@@ -74,6 +74,18 @@
 
   tbody tr.is-test { background: #FAF6F0; }
   tbody tr.is-test:hover { background: #F3EBE0; }
+  tbody tr.test-separator td {
+    padding: 14px 12px 10px;
+    border-top: 3px solid #C4A574;
+    border-bottom: 1px solid #E8D9C4;
+    background: #F7F0E6;
+    color: #6B4A1E;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  tbody tr.test-separator:hover { background: transparent; }
   button.flag-btn {
     padding: 6px 10px; font-size: 12px; background: #fff;
     color: var(--navy); border: 1px solid var(--sage);
@@ -417,10 +429,24 @@
 
     const rows = visibleRows();
     tbody.innerHTML = '';
+    let insertedTestSeparator = false;
 
     for (const row of rows) {
       const status = statusFor(row);
       const isTest = Boolean(row.is_test);
+
+      // Thick divider between the last Real vendor and the first Test vendor.
+      if (isTest && !insertedTestSeparator) {
+        const sep = document.createElement('tr');
+        sep.className = 'test-separator';
+        const sepCell = document.createElement('td');
+        sepCell.colSpan = 7;
+        sepCell.textContent = 'Test vendors';
+        sep.append(sepCell);
+        tbody.append(sep);
+        insertedTestSeparator = true;
+      }
+
       const tr = document.createElement('tr');
       if (isTest) tr.classList.add('is-test');
 
